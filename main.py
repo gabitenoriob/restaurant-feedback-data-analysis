@@ -4,9 +4,11 @@ import psycopg2
 from google.cloud import bigquery
 import pandas_gbq
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 
-
+print("Rodando a Cloud Function de ETL de Feedbacks")
 # --- Função Principal da Cloud Function ---
 def run_etl(request):
     """
@@ -39,7 +41,8 @@ def run_etl(request):
         # Seleciona e renomeia colunas para o Data Warehouse
         df_final = df_bruto[['id', 'attendantName', 'serviceRating', 'categoria_nps', 'sentimento_servico']]
         df_final = df_final.rename(columns={'id': 'id_feedback_origem'})
-        df_final['data_carga_dw'] = datetime.utcnow()
+        from datetime import timezone
+        df_final['data_carga_dw'] = datetime.now(timezone.utc)
         print("Transformação concluída.")
 
         # --- ETAPA DE CARGA ---
