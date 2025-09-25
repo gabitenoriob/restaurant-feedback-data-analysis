@@ -5,6 +5,8 @@ from google.cloud import bigquery
 import pandas_gbq
 from datetime import datetime
 from dotenv import load_dotenv
+
+from limpeza_dados import limpeza_dados
 load_dotenv()
 
 
@@ -24,8 +26,7 @@ def run_etl(request):
             user=os.environ.get("DB_USER"),
             password=os.environ.get("DB_PASS")
         )
-        # Pega feedbacks das últimas 24 horas para garantir que não se perca nada.
-        query = "SELECT * FROM public.feedbacks WHERE created_at > NOW() - INTERVAL '1 day';"
+        query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '1 day';"
         df_bruto = pd.read_sql_query(query, conn)
         conn.close()
         print(f"Extração concluída. {len(df_bruto)} registros encontrados.")
@@ -35,11 +36,11 @@ def run_etl(request):
             return ("Nenhum dado novo.", 200)
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
-        # df_bruto['sentimento_servico'] = df_bruto['serviceComment'].apply(analisar_sentimento)
-        # df_bruto['categoria_nps'] = df_bruto['recommendationRating'].apply(calcula_nps)
-        
+        df_limpo = limpeza_dados(df_bruto)
+        print("Limpeza e transformação dos dados concluídas.")
+
         # Seleciona e renomeia colunas para o Data Warehouse
-        df_final = df_bruto[['id', 'attendantName', 'serviceRating', 'categoria_nps', 'sentimento_servico']]
+        df_final = df_limpo[['id', 'attendantName', 'serviceRating', 'categoria_nps', 'sentimento_servico']]
         df_final = df_final.rename(columns={'id': 'id_feedback_origem'})
         from datetime import timezone
         df_final['data_carga_dw'] = datetime.now(timezone.utc)
@@ -47,7 +48,7 @@ def run_etl(request):
 
         # --- ETAPA DE CARGA ---
         project_id = os.environ.get("GCP_PROJECT_ID")
-        tabela_destino = "seu_dataset.fato_feedbacks" # <-- MUDE AQUI
+        tabela_destino = "restaurant_feedback.fato_feedbacks" 
         
         pandas_gbq.to_gbq(
             df_final,
@@ -63,3 +64,6 @@ def run_etl(request):
         print(f"ERRO no ETL: {e}")
         # É importante retornar um erro 500 para que o Cloud Scheduler saiba que falhou.
         return ("Erro no ETL", 500)
+    
+
+run_etl(None)  # Para testes locais, remova ou comente esta linha ao implantar na nuvem.
