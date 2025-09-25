@@ -26,6 +26,7 @@ def run_etl(request):
             user=os.environ.get("DB_USER"),
             password=os.environ.get("DB_PASS")
         )
+        #Atualiza por dia
         query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '1 day';"
         df_bruto = pd.read_sql_query(query, conn)
         conn.close()
@@ -36,15 +37,9 @@ def run_etl(request):
             return ("Nenhum dado novo.", 200)
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
-        df_limpo = limpeza_dados(df_bruto)
+        df_final = limpeza_dados(df_bruto)
         print("Limpeza e transformação dos dados concluídas.")
 
-        # Seleciona e renomeia colunas para o Data Warehouse
-        df_final = df_limpo[['id', 'attendantName', 'serviceRating', 'categoria_nps', 'sentimento_servico']]
-        df_final = df_final.rename(columns={'id': 'id_feedback_origem'})
-        from datetime import timezone
-        df_final['data_carga_dw'] = datetime.now(timezone.utc)
-        print("Transformação concluída.")
 
         # --- ETAPA DE CARGA ---
         project_id = os.environ.get("GCP_PROJECT_ID")
