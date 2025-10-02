@@ -7,7 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from limpeza_dados import limpeza_dados
-import transformar_dados
+from transformar_dados import transformar_dados
 load_dotenv()
 
 
@@ -59,7 +59,7 @@ def run_etl(request):
         return ("ETL executado com sucesso!", 200)
 
     except Exception as e:
-        print(f"ERRO no ETL: {e}")
+        print(f"ERRO no ETL: {e} na etapa {e.__traceback__.tb_lineno}")
         return ("Erro no ETL", 500)
     
 

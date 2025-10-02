@@ -33,9 +33,9 @@ def limpeza_dados(df):
         df['food_comment'] = df['food_comment'].apply(clean_text)
     else:
         df['food_comment'] = None
-    if 'enviroment_comment' in df and df['enviroment_comment'].notnull().any():
-        df['enviroment_comment'] = df['enviroment_comment'].apply(clean_text)
+    if 'environment_comment' in df and df['environment_comment'].notnull().any():
+        df['environment_comment'] = df['environment_comment'].apply(clean_text)
     else:
-        df['enviroment_comment'] = None
+        df['environment_comment'] = None
 
     return df
