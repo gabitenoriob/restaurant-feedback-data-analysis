@@ -1,6 +1,19 @@
 # Função para analisar o sentimento do comentário
 from textblob import TextBlob
 
+def transformar_dados(df):
+    """
+    Função para transformar os dados limpos, adicionando colunas de análise de sentimento e categoria NPS.
+    """
+    # Análise de sentimento para comentários de serviço, comida e ambiente
+    df['sentimento_servico'] = df['service_comment'].apply(analisar_sentimento)
+    df['sentimento_comida'] = df['food_comment'].apply(analisar_sentimento)
+    df['sentimento_ambiente'] = df['enviroment_comment'].apply(analisar_sentimento)
+
+    # Cálculo da categoria NPS com base na nota de satisfação
+    df['categoria_nps'] = df['satisfaction_rating'].apply(calcula_nps)
+
+    return df
 
 def analisar_sentimento(comentario):
     if not comentario or not isinstance(comentario, str) or comentario.strip() == "":

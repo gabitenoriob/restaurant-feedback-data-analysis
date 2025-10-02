@@ -7,6 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from limpeza_dados import limpeza_dados
+import transformar_dados
 load_dotenv()
 
 
@@ -39,7 +40,7 @@ def run_etl(request):
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
         df_final = limpeza_dados(df_bruto)
-        #aqui falta chamar a tranformaçao 
+        df_final = transformar_dados(df_final)
         print("Limpeza e transformação dos dados concluídas.")
 
 
