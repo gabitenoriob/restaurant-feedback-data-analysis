@@ -28,6 +28,7 @@ def run_etl(request):
         )
         #Atualiza por dia
         query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '1 day';"
+        print("Executando a query:", query) 
         df_bruto = pd.read_sql_query(query, conn)
         conn.close()
         print(f"Extração concluída. {len(df_bruto)} registros encontrados.")
@@ -38,6 +39,7 @@ def run_etl(request):
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
         df_final = limpeza_dados(df_bruto)
+        #aqui falta chamar a tranformaçao 
         print("Limpeza e transformação dos dados concluídas.")
 
 
@@ -57,7 +59,6 @@ def run_etl(request):
 
     except Exception as e:
         print(f"ERRO no ETL: {e}")
-        # É importante retornar um erro 500 para que o Cloud Scheduler saiba que falhou.
         return ("Erro no ETL", 500)
     
 
