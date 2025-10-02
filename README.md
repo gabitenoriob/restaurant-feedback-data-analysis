@@ -16,19 +16,19 @@ A análise busca responder a perguntas como:
 
 ## 📊 Fonte de Dados
 
-O conjunto de dados utilizado neste projeto foi obtido de [**adicione a fonte aqui**]. Ele contém as seguintes colunas:
+O conjunto de dados utilizado neste projeto foi obtido de feedbacks reais de um restaurante em Maceió-AL. Ele contém as seguintes colunas:
 
 - **id_avaliacao:** Identificador único para cada feedback.
 - **nota:** A nota dada pelo cliente (ex: de 1 a 5).
 - **comentario:** O texto do feedback deixado pelo cliente.
 - **data:** A data em que o feedback foi registrado.
-- **...:** (Adicione outras colunas relevantes, como `prato_pedido`, `id_cliente`, etc.)
+- etc
 
 ## 🛠️ Tecnologias Utilizadas
 
 Este projeto foi desenvolvido utilizando as seguintes tecnologias e bibliotecas:
 
-- **Linguagem:** Python 3.x
+- **Linguagem:** Python 3.11
 - **Bibliotecas de Análise:**
   - `pandas`: Para manipulação e limpeza dos dados.
   - `numpy`: Para operações numéricas.
