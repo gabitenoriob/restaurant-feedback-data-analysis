@@ -24,18 +24,7 @@ def limpeza_dados(df):
     else:
         df['attendant_name'] = None
 
-    if 'service_comment' in df and df['service_comment'].notnull().any():
-        df['service_comment'] = df['service_comment'].apply(clean_text)
-    else:
-        df['service_comment'] = None
-
-    if 'food_comment' in df and df['food_comment'].notnull().any():
-        df['food_comment'] = df['food_comment'].apply(clean_text)
-    else:
-        df['food_comment'] = None
-    if 'environment_comment' in df and df['environment_comment'].notnull().any():
-        df['environment_comment'] = df['environment_comment'].apply(clean_text)
-    else:
-        df['environment_comment'] = None
+    if 'general_comment' in df and df['general_comment'].notnull().any() :
+        df['general_comment'] = df['general_comment'].apply(clean_text)
 
     return df
