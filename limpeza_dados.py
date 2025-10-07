@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pandas as pd
 #
 
-def limpeza_dados(df):
+def limpeza_dados(df, df_atendentes ):
     """
     Função para limpar e transformar os dados brutos.
     """
@@ -19,12 +19,8 @@ def limpeza_dados(df):
             text = re.sub(r'\s+', ' ', text)  # Remove espaços extras
             return text.strip()
         return None
-    if 'attendant_name' in df and df['attendant_name'].notnull().any() :
-        df['attendant_name'] = df['attendant_name'].apply(clean_text)
-    else:
-        df['attendant_name'] = None
+    df['general_comment'] = df['general_comment'].apply(clean_text)
 
-    if 'general_comment' in df and df['general_comment'].notnull().any() :
-        df['general_comment'] = df['general_comment'].apply(clean_text)
+    df['attendant_name'] = df['attendant_id'].map(df_atendentes.set_index('id')['name'])
 
     return df

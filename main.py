@@ -28,9 +28,11 @@ def run_etl(request):
             password=os.environ.get("DB_PASS")
         )
         #Atualiza por dia
-        query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '1 day';"
+        query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '10 day';"
+        query_attendant = "SELECT id, name FROM public.attendants;"
         print("Executando a query:", query) 
         df_bruto = pd.read_sql_query(query, conn)
+        df_atendentes = pd.read_sql_query(query_attendant, conn)
         conn.close()
         print(f"Extração concluída. {len(df_bruto)} registros encontrados.")
 
@@ -39,7 +41,7 @@ def run_etl(request):
             return ("Nenhum dado novo.", 200)
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
-        df_final = limpeza_dados(df_bruto)
+        df_final = limpeza_dados(df_bruto,df_atendentes)
         df_final = transformar_dados(df_final)
         print("Limpeza e transformação dos dados concluídas.")
 

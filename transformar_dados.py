@@ -3,6 +3,13 @@ import nltk
 import spacy
 from transformers import pipeline
 import json # Importado para visualização
+import nltk
+
+nltk.download('punkt')      # necessário
+nltk.download('punkt_tab')  # tokenização tabular em português
+
+from nltk.tokenize import word_tokenize
+
 
 # --- 1. CONFIGURAÇÃO INICIAL E CARREGAMENTO DOS MODELOS ---
 
@@ -10,7 +17,8 @@ print("Carregando modelo BERT...")
 # Carrega o pipeline de sentimento do Hugging Face
 sentiment_pipeline = pipeline(
     task="sentiment-analysis",
-    model="nlptown/bert-base-multilingual-uncased-sentiment"
+    model="distilbert-base-multilingual-cased"
+    #"nlptown/bert-base-multilingual-uncased-sentiment"
 )
 
 print("Carregando modelo spaCy...")
@@ -18,11 +26,21 @@ print("Carregando modelo spaCy...")
 nlp_spacy = spacy.load("pt_core_news_lg")
 
 print("Carregando NLTK...")
-# Baixa o tokenizador de sentenças do NLTK (se necessário)
+
 try:
     nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
+except LookupError:
+    print("Baixando recurso NLTK 'punkt'...")
     nltk.download('punkt')
+
+from nltk.tokenize import word_tokenize, sent_tokenize
+
+def tokenize_portuguese(texto):
+    return word_tokenize(texto, language="portuguese")
+
+def sent_tokenize_portuguese(texto):
+    return sent_tokenize(texto, language="portuguese")
+
 
 print("Configuração concluída!")
 
@@ -36,7 +54,7 @@ ASPECT_KEYWORDS = {
         "saboroso", "fresco", "quentinho", "frio", "bem servido", "mal passado", "ponto da carne", "grelhado", "assado",
         "frito", "cru", "vegano", "vegetariano", "porção generosa", "apresentação", "montagem", "textura", "cheiro", "aroma"
     ],
-    "serviço": [
+    "servico": [
         "serviço", "atendimento", "atendente", "garçom", "garçonete", "equipe", "demora", "rapidez", "atencioso",
         "grosseiro", "educado", "prestativo", "simpático", "gentil", "cortês", "mal educado", "eficiente", "ineficiente",
         "lento", "demorado", "organizado", "desorganizado", "profissional", "amador", "receptivo", "indelicado",
@@ -51,29 +69,44 @@ ASPECT_KEYWORDS = {
         "terraço", "varanda", "interno", "externo", "mesas", "cadeiras", "banheiro", "banheiros limpos", "higiene",
         "toalete", "ambiente familiar", "romântico", "sofisticado", "moderno", "rústico", "agradável para conversar",
         "decorado", "climatizado", "aconchego", "energia do lugar", "atmosfera", "vibe", "música alta", "música ambiente"
-    ]
+    ],
+    "geral": ["recomendo", "não recomendo", "voltarei", "não voltarei", "experiencia ótima", "experiencia ruim", "experiencia maravilhosa", "experiencia péssima", "vale a pena", "não vale a pena", "custo benefício", "preço justo", "caro", "barato", "muito caro", "muito barato", "promoção", "desconto", "oferta", "custo benefício"] 
 }
 
 # --- 3. DEFINIÇÃO DAS FUNÇÕES AUXILIARES DE ANÁLISE ---
 
 def extrair_frases_por_aspecto(texto, aspecto_keywords):
     frases_relevantes = []
-    sentencas = nltk.sent_tokenize(texto, language='portuguese')
+    sentencas = sent_tokenize_portuguese(texto)
     for sentenca in sentencas:
         if any(keyword in sentenca.lower() for keyword in aspecto_keywords):
             frases_relevantes.append(sentenca)
     return frases_relevantes
 
+# def analisar_sentimento_bert(frase):
+#     resultado = sentiment_pipeline(frase)[0]
+#     estrelas = int(resultado['label'].split(' ')[0])
+    
+#     if estrelas >= 4:
+#         return "Positivo"
+#     elif estrelas == 3:
+#         return "Neutro"
+#     else:
+#         return "Negativo"
+
 def analisar_sentimento_bert(frase):
     resultado = sentiment_pipeline(frase)[0]
-    estrelas = int(resultado['label'].split(' ')[0])
-    
-    if estrelas >= 4:
-        return "Positivo"
-    elif estrelas == 3:
-        return "Neutro"
-    else:
-        return "Negativo"
+    label = resultado['label']
+
+    # Mapeamento dos labels do modelo para sentimento
+    label_map = {
+        "LABEL_0": "Negativo",
+        "LABEL_1": "Neutro",
+        "LABEL_2": "Positivo"
+    }
+
+    return label_map.get(label, "Desconhecido")
+
 
 def extrair_justificativa_spacy(frase, aspecto_keywords):
     doc = nlp_spacy(frase)
@@ -90,19 +123,19 @@ def extrair_justificativa_spacy(frase, aspecto_keywords):
     return list(justificativas)
 
 def analisar_comentario_completo(comentario):
-    """Orquestra a análise de um único comentário, retornando um dicionário com os resultados."""
-    # Garante que o comentário é uma string e não está vazio
     if not isinstance(comentario, str) or not comentario.strip():
         return {}
-
+    
     resultados_finais = {}
+    
     for aspecto, keywords in ASPECT_KEYWORDS.items():
         frases_relevantes = extrair_frases_por_aspecto(comentario, keywords)
         if not frases_relevantes:
             continue
-
+        
         sentimentos_aspecto = [analisar_sentimento_bert(frase) for frase in frases_relevantes]
         justificativas_aspecto = []
+        
         for frase in frases_relevantes:
             justificativas_aspecto.extend(extrair_justificativa_spacy(frase, keywords))
         
@@ -111,11 +144,12 @@ def analisar_comentario_completo(comentario):
             sentimento_geral = "Misto"
         elif sentimentos_aspecto:
             sentimento_geral = max(set(sentimentos_aspecto), key=sentimentos_aspecto.count)
-
+        
         resultados_finais[aspecto] = {
             "sentimento": sentimento_geral,
             "justificativa": list(set(justificativas_aspecto))
         }
+    
     return resultados_finais
 
 def calcula_nps(nota):
@@ -131,34 +165,37 @@ def calcula_nps(nota):
         return "Desconhecido"
 
 
-def transformar_dados(df, coluna_comentario='general_comment', coluna_nota='satisfaction_rating'):
-    """
-    Função principal que aplica a análise de sentimentos e o cálculo de NPS a um DataFrame.
-    """
+def transformar_dados(df, coluna_comentario='general_comment', coluna_nota='recommendation_rating'):
     print("Iniciando a transformação dos dados...")
-
-    # Garante que as colunas de entrada existem
+    print(f"Colunas do DataFrame: {df.columns.tolist()}")
     if coluna_comentario not in df.columns or coluna_nota not in df.columns:
         raise ValueError(f"O DataFrame precisa ter as colunas '{coluna_comentario}' e '{coluna_nota}'")
     
-    # 1. Aplica a análise de sentimentos baseada em aspectos
-    # O .apply executa a função 'analisar_comentario_completo' para cada linha
     resultados_analise = df[coluna_comentario].apply(analisar_comentario_completo)
-
-    # 2. Converte a série de dicionários em um DataFrame
     df_analise = pd.json_normalize(resultados_analise)
-    print("Resultados da análise (exemplo):")
-    print(df_analise.head().to_json(orient='records', force_ascii=False, indent=2))  
 
-    # 3. Renomeia as colunas para um formato mais limpo (ex: 'comida.sentimento' -> 'sentimento_comida')
-    df_analise.columns = [f"{col.split('.')[1]}_{col.split('.')[0]}" for col in df_analise.columns]
+    sentimento_cols = [col for col in df_analise.columns if col.endswith(".sentimento")]
+    df_analise = df_analise[sentimento_cols]
 
-    # 4. Junta o DataFrame original com os resultados da análise
+    df_analise.columns = [f"sentimento_{col.split('.')[0]}" for col in sentimento_cols]
+
+    # Garantir colunas vazias preenchidas com "Neutro"
+    for aspecto in ASPECT_KEYWORDS.keys():
+        col_name = f"sentimento_{aspecto}"
+        if col_name not in df_analise.columns:
+            df_analise[col_name] = "Não"
+
     df_final = pd.concat([df, df_analise], axis=1)
 
-    # 5. Calcula e adiciona a coluna de categoria NPS
+    # Adiciona coluna geral baseada no aspecto "geral"
+    if "sentimento_geral" in df_analise.columns:
+        df_final["sentimento_geral"] = df_analise["sentimento_geral"]
+    else:
+        df_final["sentimento_geral"] = "Não"
+
     df_final['categoria_nps'] = df_final[coluna_nota].apply(calcula_nps)
-    
+    print(df_final.columns.tolist())
+
     print("Transformação concluída.")
     return df_final
 
