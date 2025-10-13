@@ -3,9 +3,11 @@ import pandas as pd
 import psycopg2
 from google.cloud import bigquery
 import pandas_gbq
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from transformar_dados import transformar_dados
+from medicao_churn import medicao_churn
+from calcular_nps import calcular_nps
 load_dotenv()
 
 

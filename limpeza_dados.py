@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-
+import re
 import pandas as pd
 
 def limpar_texto(texto):
