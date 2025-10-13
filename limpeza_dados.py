@@ -1,26 +1,14 @@
 from datetime import datetime, timezone
 
 import pandas as pd
-#
 
-def limpeza_dados(df, df_atendentes ):
-    """
-    Função para limpar e transformar os dados brutos.
-    """
-    import re
-    df = df.rename(columns={'id': 'id_feedback_origem'})
-    df['data_carga_dw'] = datetime.now(timezone.utc)
-    df['data_feedback'] = df['timestamp']
-    df = df.drop(columns=['timestamp'])
-    
-    # Limpeza de comentários: remover espaços extras e normalizar texto
-    def clean_text(text):
-        if isinstance(text, str):
-            text = re.sub(r'\s+', ' ', text)  # Remove espaços extras
-            return text.strip()
-        return None
-    df['general_comment'] = df['general_comment'].apply(clean_text)
+def limpar_texto(texto):
+    """Limpeza leve do texto antes da análise"""
+    if not isinstance(texto, str):
+        return ""
+    texto = texto.lower()
+    texto = re.sub(r"http\S+|www\S+|https\S+", '', texto)
+    texto = re.sub(r"[^a-zA-ZÀ-ÿ\s]", '', texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
 
-    df['attendant_name'] = df['attendant_id'].map(df_atendentes.set_index('id')['name'])
-
-    return df
+    return texto

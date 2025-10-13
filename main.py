@@ -5,8 +5,6 @@ from google.cloud import bigquery
 import pandas_gbq
 from datetime import datetime
 from dotenv import load_dotenv
-
-from limpeza_dados import limpeza_dados
 from transformar_dados import transformar_dados
 load_dotenv()
 
@@ -33,6 +31,9 @@ def run_etl(request):
         print("Executando a query:", query) 
         df_bruto = pd.read_sql_query(query, conn)
         df_atendentes = pd.read_sql_query(query_attendant, conn)
+        print(f"colunas: {df_bruto.columns.tolist()}")
+        print(f"colunas: {df_atendentes.columns.tolist()}")
+
         conn.close()
         print(f"Extração concluída. {len(df_bruto)} registros encontrados.")
 
@@ -41,9 +42,30 @@ def run_etl(request):
             return ("Nenhum dado novo.", 200)
 
         # --- ETAPA DE TRANSFORMAÇÃO ---
-        df_final = limpeza_dados(df_bruto,df_atendentes)
-        df_final = transformar_dados(df_final)
+        df_bruto = df_bruto.rename(columns={'id': 'id_feedback_origem'})
+        df_bruto['data_carga_dw'] = datetime.now(timezone.utc)
+        df_bruto['data_feedback'] = df_bruto['timestamp']
+        df_bruto['dia_semana'] = df_bruto['timestamp'].dt.day_name()
+        df_bruto = df_bruto.drop(columns=['timestamp'])
+
+        df_bruto['attendant_name'] = df_bruto['attendant_id'].map(df_atendentes.set_index('id')['name'])
+        df_final, topic_model = transformar_dados(df_bruto)
+        document_info = topic_model.get_document_info(df_final['general_comment'])
+        document_info = document_info.rename(columns={
+            'Topic': 'id_topico',
+            'Name': 'nome_topico',
+            'Top_n_words': 'palavras_chave_topico',
+            'Probability': 'probabilidade_topico',
+            'Representative_document': 'documento_representativo'
+        })
+
+        df_final_com_topicos = df_final.join(document_info)
         print("Limpeza e transformação dos dados concluídas.")
+
+        #Churn e NPS
+        df_final_com_topicos['churn_pred'] = medicao_churn(df_final_com_topicos)
+        df_final_com_topicos['nps_pred'] = calcular_nps(df_final_com_topicos)
+
 
 
         # --- ETAPA DE CARGA ---
@@ -51,12 +73,12 @@ def run_etl(request):
         tabela_destino = "restaurant_feedback.fato_feedbacks" 
         
         pandas_gbq.to_gbq(
-            df_final,
+            df_final_com_topicos,
             tabela_destino,
             project_id=project_id,
             if_exists='append'
         )
-        print(f"Carga concluída. {len(df_final)} registros carregados no BigQuery.")
+        print(f"Carga concluída. {len(df_final_com_topicos)} registros carregados no BigQuery.")
         
         return ("ETL executado com sucesso!", 200)
 
