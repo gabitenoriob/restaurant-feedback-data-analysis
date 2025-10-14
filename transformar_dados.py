@@ -1,151 +1,250 @@
 import pandas as pd
-import nltk
 import spacy
 from transformers import pipeline
-import json
 import re
-from nltk.tokenize import word_tokenize, sent_tokenize
-from sentence_transformers import SentenceTransformer
-from bertopic import BERTopic
-from limpeza_dados import limpar_dados
+from collections import defaultdict
 
-nltk.download('punkt')
-nltk.download('punkt_tab', quiet=True)
-
-print("Carregando modelo BERT...")
-#baixa o modelo do huggingface 
-sentiment_pipeline = pipeline(
+print("Carregando modelo de sentimento (BERT)...")
+# O modelo nlptown é ótimo para essa tarefa de classificação em 5 estrelas.
+SENTIMENT_PIPELINE = pipeline(
     task="sentiment-analysis",
-    #model="distilbert-base-multilingual-cased"
-    model = "nlptown/bert-base-multilingual-uncased-sentiment"
+    model="nlptown/bert-base-multilingual-uncased-sentiment"
 )
 
-print("Carregando modelo spaCy...")
-nlp_spacy = spacy.load("pt_core_news_lg")
-
-print("Configuração concluída!")
-
-ASPECT_KEYWORDS = { "comida": [ "comida", "prato", "pratos", "refeição", "sabor", "sabores", "cardápio", "menu", "picanha", "moqueca", "sobremesa", "entrada", "porção", "lanche", "almoço", "jantar", "café", "bebida", "drinque", "coquetel", "aperitivo", "massa", "carne", "peixe", "frango", "salada", "sopa", "tempero", "temperado", "salgado", "doce", "gostoso", "delicioso", "saboroso", "fresco", "quentinho", "frio", "bem servido", "mal passado", "ponto da carne", "grelhado", "assado", "frito", "cru", "vegano", "vegetariano", "porção generosa", "apresentação", "montagem", "textura", "cheiro", "aroma" ], "servico": [ "serviço", "atendimento", "atendente", "garçom", "garçonete", "equipe", "demora", "rapidez", "atencioso", "grosseiro", "educado", "prestativo", "simpático", "gentil", "cortês", "mal educado", "eficiente", "ineficiente", "lento", "demorado", "organizado", "desorganizado", "profissional", "amador", "receptivo", "indelicado", "disponível", "solícito", "comunicação", "pedido", "erro no pedido", "acertaram o pedido", "demoraram muito", "pronto atendimento", "resposta rápida", "falta de atenção", "cordial", "respeitoso", "atraso", "tratamento", "garçom sumiu", "garçom rápido", "educação", "boa vontade", "resolução", "problema resolvido", "cuidado com cliente" ], "ambiente": [ "ambiente", "lugar", "espaço", "decoração", "música", "barulho", "limpeza", "confortável", "aconchegante", "barulhento", "tranquilo", "agradável", "bonito", "iluminação", "claridade", "escuridão", "lotado", "vazio", "organização", "bagunçado", "ventilação", "ar condicionado", "cheiro", "odor", "vista", "paisagem", "jardim", "terraço", "varanda", "interno", "externo", "mesas", "cadeiras", "banheiro", "banheiros limpos", "higiene", "toalete", "ambiente familiar", "romântico", "sofisticado", "moderno", "rústico", "agradável para conversar", "decorado", "climatizado", "aconchego", "energia do lugar", "atmosfera", "vibe", "música alta", "música ambiente" ], "geral": ["recomendo", "não recomendo", "voltarei", "não voltarei", "experiencia ótima", "experiencia ruim", "experiencia maravilhosa", "experiencia péssima", "vale a pena", "não vale a pena", "custo benefício", "preço justo", "caro", "barato", "muito caro", "muito barato", "promoção", "desconto", "oferta", "custo benefício"] }
+print("Carregando modelo de linguagem (spaCy)...")
+NLP_SPACY = spacy.load("pt_core_news_lg")
 
 
+ASPECT_KEYWORDS = {
+    "comida": [
+        "comida", "prato", "sabor", "gosto", "cardápio", "menu", "bebida", "drink", "sobremesa", "almoço",
+        "janta", "jantar", "lanche", "carne", "peixe", "massa", "feijoada", "moqueca", "picanha", "sopa",
+        "salada", "porção", "entrada", "acompanhamento", "refeição", "temperatura", "temperado", "tempero"
+    ],
+    "servico": [
+        "serviço", "atendimento", "garçom", "garçonete", "equipe", "pedido", "entrega", "demora", "espera",
+        "rapidez", "atendente", "funcionário", "funcionária", "staff", "recepcionista", "tratamento", "prestador"
+    ],
+    "ambiente": [
+        "ambiente", "local", "lugar", "espaço", "decoração", "música", "barulho", "som", "iluminação", "limpeza",
+        "banheiro", "conforto", "cadeira", "mesa", "ar condicionado", "ventilação", "vista", "paisagem", "clima"
+    ],
+    "preco": [
+        "preço", "valor", "custo", "conta", "cobrança", "custo-benefício", "caro", "barato", "promoção",
+        "taxa", "gorjeta", "desconto"
+    ]
+}
 
-def extrair_frases_por_aspecto(texto, aspecto_keywords):
-    frases_relevantes = []
-    sentencas = sent_tokenize(texto, language="portuguese") #divide em frases
-    for sentenca in sentencas:
-        if any(keyword in sentenca.lower() for keyword in aspecto_keywords): #avalia se a frase tem alguma keyword
-            frases_relevantes.append(sentenca)
-    print(f"frases relevantes para o aspecto '{aspecto_keywords}': {frases_relevantes}")
-    return frases_relevantes
 
-def analisar_sentimento_bert(frase):
-    resultado = sentiment_pipeline(frase[:512])[0]
-    label = resultado['label']
-    label_map = {"LABEL_0": "Negativo", "LABEL_1": "Neutro", "LABEL_2": "Positivo"}
-    print(f"Análise de sentimento para a frase '{frase}': {label_map.get(label, 'Desconhecido')}")
-    return label_map.get(label, "Desconhecido")
+SENTIMENT_MODIFIERS = {
+    "comida": {
+        "Positivo": [
+            "delicioso", "deliciosa", "deliciosos", "deliciosas", "saboroso", "saborosa", "excelente", "ótimo", "ótima",
+            "maravilhoso", "maravilhosa", "perfeito", "perfeita", "incrível", "gostoso", "gostosa", "fresco", "fresca",
+            "quentinho", "quentinha", "bem servido", "bem servida", "porção generosa", "bem temperado", "temperado no ponto",
+            "divino", "divina", "dos deuses", "top", "show de bola", "bem servido", "porção grande"
+        ],
+        "Negativo": [
+            "ruim", "péssimo", "péssima", "horrível", "frio", "fria", "gelado", "sem sabor", "sem gosto", "insosso",
+            "sem graça", "queimado", "queimada", "cru", "crua", "seco", "seca", "gorduroso", "gordurosa", "oleoso",
+            "oleosa", "estragado", "velho", "velha", "mal cozido", "mal passada", "salgado demais", "doce demais",
+            "azedo", "amargo", "requentado", "porção pequena", "comida sem sabor"
+        ]
+    },
+    "servico": {
+        "Positivo": [
+            "rápido", "rápida", "eficiente", "atencioso", "atenciosa", "educado", "educada", "simpático", "simpática",
+            "prestativo", "prestativa", "solícito", "solícita", "cordial", "gentil", "ágil", "bom atendimento",
+            "super atencioso", "muito educado", "ótimo serviço"
+        ],
+        "Negativo": [
+            "lento", "lenta", "demorou", "demorado", "demorada", "grosseiro", "grossa", "mal educado", "mal educada",
+            "desatento", "desatenta", "confuso", "errado", "esqueceram", "sumiu", "atendimento ruim", "pouco atencioso",
+            "demora absurda", "mal treinado", "negligente", "não gostei do atendimento"
+        ]
+    },
+    "ambiente": {
+        "Positivo": [
+            "agradável", "aconchegante", "confortável", "limpo", "bonito", "tranquilo", "arejado", "moderno",
+            "organizado", "bem decorado", "agradável de ficar", "clima bom", "vista bonita", "espaçoso"
+        ],
+        "Negativo": [
+            "sujo", "barulhento", "apertado", "desconfortável", "quente", "abafado", "mal cheiro", "malcheiroso",
+            "mal iluminado", "escuro", "velho", "feio", "desorganizado", "caótico"
+        ]
+    },
+    "preco": {
+        "Positivo": [
+            "barato", "barata", "acessível", "justo", "justa", "bom preço", "preço bom", "vale a pena", "ótimo custo benefício"
+        ],
+        "Negativo": [
+            "caro", "cara", "caríssimo", "caríssima", "absurdo", "exagerado", "não vale", "roubo", "exploração",
+            "preço alto", "cobrança indevida","preço alto"
+        ]
+    },
+    "geral": {
+        "Positivo": [
+            "recomendo", "recomendo muito", "voltarei", "voltaria", "perfeito", "maravilhoso", "incrível", "vale a pena",
+            "excelente", "amei", "top", "show", "ótimo lugar", "da hora", "sensacional", "nota dez", "tudo ótimo"
+        ],
+        "Negativo": [
+            "decepcionante", "não recomendo", "não volto", "evitem", "terrível", "horrível", "péssimo", "nunca mais",
+            "lixo", "fracasso", "horrendo", "experiência ruim", "não vale a pena"
+        ]
+    }
+}
 
-def extrair_justificativa_spacy(frase, aspecto_keywords): #extrai adjetivos que justificam as notas
-    doc = nlp_spacy(frase)
-    justificativas = set()
-    for token in doc:
-        if token.lemma_.lower() in aspecto_keywords:
-            for child in token.children: #exemplo comida deliciosa comida = substantivo e deliciosa = adjetivo
-                if child.pos_ == 'ADJ':
-                    justificativas.add(child.text)
-            if token.head.pos_ == 'ADJ':
-                justificativas.add(token.head.text)
-    if not justificativas:
-        justificativas.update([token.text for token in doc if token.pos_ == 'ADJ'])
-    print(f"Justificativas encontradas para a frase '{frase}': {justificativas}")
-    return list(justificativas)
 
-def analisar_comentario_completo(comentario): #Orquestra tudo para um único comentário.
-    if not isinstance(comentario, str) or not comentario.strip():
-        return {}
-    
-    comentario_limpo = limpar_texto(comentario)
-    resultados_finais = {}
-    
-    for aspecto, keywords in ASPECT_KEYWORDS.items():
-        frases_relevantes = extrair_frases_por_aspecto(comentario_limpo, keywords)
-        if not frases_relevantes:
-            continue
-        
-        sentimentos_aspecto = [analisar_sentimento_bert(frase) for frase in frases_relevantes]
-        justificativas_aspecto = []
-        
-        for frase in frases_relevantes:
-            justificativas_aspecto.extend(extrair_justificativa_spacy(frase, keywords))
-        
-        sentimento_geral = "Neutro"
-        if "Positivo" in sentimentos_aspecto and "Negativo" in sentimentos_aspecto:
-            sentimento_geral = "Misto"
-        elif sentimentos_aspecto:
-            sentimento_geral = max(set(sentimentos_aspecto), key=sentimentos_aspecto.count)
-        
-        resultados_finais[aspecto] = {
-            "sentimento": sentimento_geral,
-            "justificativa": list(set(justificativas_aspecto))
+NEGATIONS = [
+    "não", "nao", "nunca", "jamais", "sem", "nem", "tampouco", "de forma alguma", "de jeito nenhum"
+]
+
+ALL_SENTIMENT_MODIFIERS = {
+    "Positivo": list(set([kw for aspect in SENTIMENT_MODIFIERS.values() for kw in aspect.get("Positivo", [])])),
+    "Negativo": list(set([kw for aspect in SENTIMENT_MODIFIERS.values() for kw in aspect.get("Negativo", [])]))
+}
+
+
+class AspectBasedSentimentAnalyzer:
+    def __init__(self, nlp_model, aspect_keywords, sentiment_modifiers, negations):
+        self.nlp = nlp_model
+        self.sentiment_modifiers = sentiment_modifiers
+        self.negations = negations
+        self._keyword_to_aspect_map = {
+            self.nlp(kw)[0].lemma_: aspect 
+            for aspect, kws in aspect_keywords.items() 
+            for kw in kws
         }
-    
-    return resultados_finais
 
-def calcula_nps(nota):
-    try:
-        nota = int(nota)
-        if nota >= 9:
-            return "Promotor"
-        elif 7 <= nota <= 8:
-            return "Passivo"
-        else:
-            return "Detrator"
-    except (ValueError, TypeError):
-        return "Desconhecido"
+    def _get_sentiment_from_phrase(self, phrase):
+        """Analisa uma pequena frase (chunk) e retorna o sentimento e a palavra que o definiu."""
+        text_lower = phrase.lower()
+        is_negated = any(f"{neg} " in text_lower for neg in self.negations)
 
-def agrupar_comentarios_por_tema(df, coluna_comentario="general_comment"):
-    modelo_embeddings = SentenceTransformer("all-MiniLM-L6-v2")
-    textos = df[coluna_comentario].astype(str).apply(limpar_texto).tolist()
-    embeddings = modelo_embeddings.encode(textos, show_progress_bar=True)
-    topic_model = BERTopic(language="portuguese", verbose=True)
-    topics, probs = topic_model.fit_transform(textos, embeddings)
-    df["topico"] = topics
-    return df, topic_model
+        # Procura por modificadores negativos primeiro, pois costumam ter mais peso
+        for keyword in self.sentiment_modifiers["Negativo"]:
+            if keyword in text_lower:
+                return "Positivo" if is_negated else "Negativo", keyword
+        
+        for keyword in self.sentiment_modifiers["Positivo"]:
+            if keyword in text_lower:
+                return "Negativo" if is_negated else "Positivo", keyword
+        
+        return "Neutro", None
 
-def transformar_dados(df, coluna_comentario='general_comment', coluna_nota='recommendation_rating'):
-    print("Iniciando a transformação dos dados...")
-    if coluna_comentario not in df.columns or coluna_nota not in df.columns:
-        raise ValueError(f"O DataFrame precisa ter as colunas '{coluna_comentario}' e '{coluna_nota}'")
-    
-    # Análise de sentimentos por aspecto
-    resultados_analise = df[coluna_comentario].apply(analisar_comentario_completo)
+    def analyze(self, comment):
+        if not isinstance(comment, str) or not comment.strip():
+            return {}
+        
+        doc = self.nlp(comment)
+        aspect_sentiments = defaultdict(list)
+
+        for sent in doc.sents:
+            found_aspects_in_sent = {}
+            # Primeiro, encontra todos os aspectos na sentença
+            for token in sent:
+                aspect = self._keyword_to_aspect_map.get(token.lemma_)
+                if aspect:
+                    found_aspects_in_sent[token.i] = (aspect, token) # Salva o índice do token do aspecto
+
+            if not found_aspects_in_sent:
+                continue
+
+            # Agora, para cada palavra na sentença, verifica se é uma opinião
+            for token in sent:
+                sentiment, modifier = self._get_sentiment_from_phrase(token.text)
+                
+                if sentiment != "Neutro":
+                    # Se encontrou uma opinião, procura o aspecto mais próximo a ela
+                    closest_aspect_token = None
+                    min_distance = float('inf')
+                    
+                    for aspect_idx, (aspect, aspect_token) in found_aspects_in_sent.items():
+                        distance = abs(token.i - aspect_idx)
+                        if distance < min_distance:
+                            min_distance = distance
+                            closest_aspect_token = aspect_token
+                    
+                    if closest_aspect_token:
+                        aspect_name = self._keyword_to_aspect_map.get(closest_aspect_token.lemma_)
+                        # Constrói uma justificativa mais completa (ex: "ambiente sujo")
+                        justification = f"{closest_aspect_token.text} {modifier}" if min_distance <= 2 else modifier
+                        aspect_sentiments[aspect_name].append({
+                            "sentimento": sentiment,
+                            "justificativa": justification
+                        })
+
+        final_results = {}
+        for aspect, opinions in aspect_sentiments.items():
+            if not opinions: continue
+            
+            sentimentos = [op['sentimento'] for op in opinions]
+            justificativas = [op['justificativa'] for op in opinions]
+            
+            if "Positivo" in sentimentos and "Negativo" in sentimentos: final_sentiment = "Misto"
+            elif "Negativo" in sentimentos: final_sentiment = "Negativo"
+            else: final_sentiment = "Positivo"
+
+            final_results[aspect] = {
+                "sentimento": final_sentiment,
+                "justificativa": sorted(list(set(justificativas)), key=len, reverse=True)
+            }
+        return final_results
+
+def transformar_dados(df, coluna_comentario='general_comment'):
+    print("Iniciando a transformação dos dados com a lógica CORRIGIDA...")
+    analyzer = AspectBasedSentimentAnalyzer(
+        nlp_model=NLP_SPACY,
+        aspect_keywords=ASPECT_KEYWORDS,
+        sentiment_modifiers=ALL_SENTIMENT_MODIFIERS, 
+        negations=NEGATIONS
+    )
+    resultados_analise = df[coluna_comentario].apply(analyzer.analyze)
     df_analise = pd.json_normalize(resultados_analise)
+    df_final = df.copy()
+    all_aspects = list(ASPECT_KEYWORDS.keys())
+    
+    aspect_sentiment_cols = [] 
+    
+    for aspecto in all_aspects:
+        col_sentimento = f"sentimento_{aspecto}"
+        col_justificativa = f"justificativa_{aspecto}"
+        aspect_sentiment_cols.append(col_sentimento)
 
-    # Extrair colunas de sentimento
-    sentimento_cols = [col for col in df_analise.columns if col.endswith(".sentimento")]
-    df_analise = df_analise[sentimento_cols]
-    df_analise.columns = [f"sentimento_{col.split('.')[0]}" for col in sentimento_cols]
+        if f"{aspecto}.sentimento" in df_analise.columns:
+            df_final[col_sentimento] = df_analise[f"{aspecto}.sentimento"]
+        else:
+            df_final[col_sentimento] = "Não Mencionado"
+        
+        if f"{aspecto}.justificativa" in df_analise.columns:
+            df_final[col_justificativa] = df_analise[f"{aspecto}.justificativa"].fillna("").apply(list)
+        else:
+            df_final[col_justificativa] = [[] for _ in range(len(df_final))]
 
-    # Garantir que todos os aspectos estejam presentes
-    for aspecto in ASPECT_KEYWORDS.keys():
-        col_name = f"sentimento_{aspecto}"
-        if col_name not in df_analise.columns:
-            df_analise[col_name] = "Não"
+    def calcular_sentimento_geral(row):
+        sentimentos = [row[col] for col in aspect_sentiment_cols if row[col] != "Não Mencionado"]
+        
+        if not sentimentos:
+            return "Indefinido"
+        
+        sentimentos_set = set(sentimentos)
+        
+        if "Positivo" in sentimentos_set and "Negativo" in sentimentos_set:
+            return "Misto"
+        if "Negativo" in sentimentos_set:
+            return "Negativo"
+        if "Positivo" in sentimentos_set:
+            return "Positivo"
+        if "Neutro" in sentimentos_set:
+            return "Neutro"
+        
+        return "Indefinido"
 
-    df_final = pd.concat([df, df_analise], axis=1)
+    df_final['sentimento_geral'] = df_final.apply(calcular_sentimento_geral, axis=1)
 
-    # Adiciona NPS
-    df_final['categoria_nps'] = df_final[coluna_nota].apply(calcula_nps)
-
-    # Agrupamento de temas
-    print("Agrupando comentários por tema...")
-    df_final, topic_model = agrupar_comentarios_por_tema(df_final, coluna_comentario)
     print("Transformação concluída!")
-    return df_final, topic_model
+    return df_final
 
-# =========================================
-# 🧪 TESTE COM DADOS DE EXEMPLO
-# =========================================
 if __name__ == "__main__":
     data = {
         "general_comment": [
@@ -153,12 +252,36 @@ if __name__ == "__main__":
             "O atendimento foi excelente e o preço justo.",
             "Demorou muito para chegar, comida fria e ruim.",
             "Ambiente agradável e comida saborosa, recomendo!",
-            "Preço alto e porção pequena, não vale a pena."
+            "Preço alto e porção pequena, não vale a pena.",
+            "O garçom foi muito educado, mas a música estava alta demais.",
+            "A sobremesa estava deliciosa, voltarei com certeza.",
+            "O banheiro estava limpo e o ambiente aconchegante.",
+            "A carne veio mal passada, pedi bem passada.",
+            "O restaurante estava lotado e o serviço foi lento.",
+            "Comida sem sabor algum.",
+            "Não gostei do atendimento.",
         ],
-        "recommendation_rating": [3, 5, 1, 5, 2]
+        "recommendation_rating": [4, 10, 1, 9, 2, 6, 10, 8, 3, 3, 2, 2]
     }
     df_exemplo = pd.DataFrame(data)
-    resultado, modelo_topicos = transformar_dados(df_exemplo)
-    print(resultado)
-    print("\n📊 Principais tópicos encontrados:")
-    print(modelo_topicos.get_topic_info().head())
+    
+    resultado = transformar_dados(df_exemplo)
+
+    
+    colunas_para_exibir = [
+        "general_comment", 
+        "sentimento_comida", "justificativa_comida",
+        "sentimento_servico", "justificativa_servico",
+        "sentimento_ambiente", "justificativa_ambiente",
+        "sentimento_preco", "justificativa_preco", 'sentimento_geral'
+    ]
+    
+    for col in colunas_para_exibir:
+        if col not in resultado.columns:
+            resultado[col] = "Não Mencionado" if "sentimento" in col else [[] for _ in range(len(resultado))]
+
+    print("\n--- RESULTADOS DA ANÁLISE CORRIGIDA ---")
+    print(resultado[colunas_para_exibir].to_string())
+    
+    resultado.to_csv("resultados_absa_corrigido.csv", index=False, encoding='utf-8-sig')
+    print("\nResultados salvos em 'resultados_absa_corrigido.csv'")

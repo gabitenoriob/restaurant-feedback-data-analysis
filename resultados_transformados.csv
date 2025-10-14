@@ -1,0 +1,21 @@
+general_comment,recommendation_rating,sentimento_comida,sentimento_ambiente,sentimento_servico,sentimento_geral,categoria_nps,topico
+"A comida estava ótima, mas o ambiente era sujo.",4,Negativo,Negativo,,,Detrator,-1
+O atendimento foi excelente e o preço justo.,10,,,Positivo,Positivo,Promotor,-1
+"Demorou muito para chegar, comida fria e ruim.",1,Negativo,,,,Detrator,-1
+"Ambiente agradável e comida saborosa, recomendo!",9,Positivo,Positivo,,Positivo,Promotor,-1
+"Preço alto e porção pequena, não vale a pena.",2,Negativo,,,Negativo,Detrator,-1
+"O garçom foi muito educado, mas a música estava alta demais.",6,,Negativo,Positivo,,Neutro,-1
+"A sobremesa estava deliciosa, voltarei com certeza.",10,Positivo,,,Positivo,Promotor,-1
+O banheiro estava limpo e o ambiente aconchegante.,8,,Negativo,,,Passivo,-1
+"A carne veio mal passada, pedi bem passada.",3,Negativo,,,,Detrator,-1
+O restaurante estava lotado e o serviço foi lento.,3,,Negativo,Negativo,,Detrator,-1
+"A decoração é linda, mas achei o cardápio caro.",6,Negativo,Neutro,,Negativo,Neutro,-1
+"O prato principal estava sem sabor, mas a entrada estava boa.",5,Neutro,,,,Detrator,-1
+"Equipe muito atenciosa, resolveram meu problema rapidamente.",9,,,Positivo,,Promotor,-1
+"O ar condicionado não funcionava, passei calor.",3,,Negativo,,,Detrator,-1
+"O drink estava ótimo, mas demorou para chegar.",7,Negativo,,,,Passivo,-1
+"Porção generosa e preço justo, recomendo!",10,Positivo,,,Positivo,Promotor,-1
+"O ambiente é familiar e tranquilo, gostei bastante.",8,,Positivo,,,Passivo,-1
+A salada estava fresca e bem temperada.,8,Positivo,,,,Passivo,-1
+"O atendimento foi ruim, garçom sumiu várias vezes.",2,,,Negativo,,Detrator,-1
+A música ambiente deixou o jantar mais agradável.,9,Neutro,Neutro,,,Promotor,-1
