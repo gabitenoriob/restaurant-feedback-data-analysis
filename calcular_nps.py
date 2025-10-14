@@ -5,9 +5,15 @@ import matplotlib.pyplot as plt
 
 def calcular_nps(df):
     # Features numéricas (exceto a recomendação)
+    df_processado = df.copy()
+    sentiment_map = {'Positivo': 1, 'Neutro': 0, 'Negativo': -1, 'Misto': 0}
+    
+    df_processado['food_rating'] = df_processado['sentimento_comida'].map(sentiment_map).fillna(0)
+    df_processado['service_rating'] = df_processado['sentimento_servico'].map(sentiment_map).fillna(0)
+    df_processado['environment_rating'] = df_processado['sentimento_ambiente'].map(sentiment_map).fillna(0)
     features = ['service_rating', 'food_rating', 'environment_rating']  
-    X = df[features]
-    y = df['recommendation_rating']
+    X = df_processado[features]
+    y = df_processado['recommendation_rating']
 
     # Treinar o modelo de regressão linear
     model = LinearRegression()
@@ -23,7 +29,7 @@ def calcular_nps(df):
     plt.title('Coeficientes da Regressão Linear')
     plt.show()
 
-    df['nps_pred'] = model.predict(X)
-    df['recommendation_rating'] = df['recommendation_rating'].fillna(df['nps_pred'])
-
-    return df
+    df_processado['nps_pred'] = model.predict(X)
+    df_processado['recommendation_rating'] = df_processado['recommendation_rating'].fillna(df_processado['nps_pred'])
+    df_processado.to_csv("nps_predictions.csv", index=False)
+    return df_processado

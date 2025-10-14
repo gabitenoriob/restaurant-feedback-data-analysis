@@ -96,7 +96,7 @@ SENTIMENT_MODIFIERS = {
 
 
 NEGATIONS = [
-    "não", "nao", "nunca", "jamais", "sem", "nem", "tampouco", "de forma alguma", "de jeito nenhum"
+    "não", "nao", "nunca", "jamais", "sem", "nem", "tampouco", "de forma alguma", "de jeito nenhum", "não gostei"
 ]
 
 ALL_SENTIMENT_MODIFIERS = {
@@ -273,7 +273,7 @@ if __name__ == "__main__":
         "sentimento_comida", "justificativa_comida",
         "sentimento_servico", "justificativa_servico",
         "sentimento_ambiente", "justificativa_ambiente",
-        "sentimento_preco", "justificativa_preco", 'sentimento_geral'
+        "sentimento_preco", "justificativa_preco", 'sentimento_geral', 'categoria_nps'
     ]
     
     for col in colunas_para_exibir:

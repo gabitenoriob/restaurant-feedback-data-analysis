@@ -120,19 +120,19 @@ if __name__ == "__main__":
     data['attendant_name'] = data['attendant_id'].map(df_atendentes.set_index('id')['name'])
 
     # Chamar funções de transformação e predição
-    df_final, topic_model = transformar_dados(data)
-    document_info = topic_model.get_document_info(df_final['general_comment'])
-    document_info = document_info.rename(columns={
-        'Topic': 'id_topico',
-        'Name': 'nome_topico',
-        'Top_n_words': 'palavras_chave_topico',
-        'Probability': 'probabilidade_topico',
-        'Representative_document': 'documento_representativo'
-    })
+    df_final = transformar_dados(data)
+    # document_info = topic_model.get_document_info(df_final['general_comment'])
+    # document_info = document_info.rename(columns={
+    #     'Topic': 'id_topico',
+    #     'Name': 'nome_topico',
+    #     'Top_n_words': 'palavras_chave_topico',
+    #     'Probability': 'probabilidade_topico',
+    #     'Representative_document': 'documento_representativo'
+    # })
 
-    df_final_com_topicos = df_final.join(document_info)
-    df_final_com_topicos = medicao_churn(df_final_com_topicos)
-    df_final_com_topicos['nps_pred'] = calcular_nps(df_final_com_topicos)
+    # df_final_com_topicos = df_final.join(document_info)
+    df_final['nps_pred'] = calcular_nps(df_final)
+    df_final_com_topicos = medicao_churn(df_final)
 
     print(df_final_com_topicos.head())
     #salvar como csv

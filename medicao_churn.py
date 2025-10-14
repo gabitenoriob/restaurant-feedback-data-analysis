@@ -23,8 +23,7 @@ def medicao_churn(df):
     features = [
         'service_rating', 'food_rating', 'environment_rating',
         'sentimento_comida', 'sentimento_ambiente', 'sentimento_servico',
-        'categoria_nps',
-        'nome_topico', 'probabilidade_topico'
+        'categoria_nps'
     ]
     target = 'churn'
 
