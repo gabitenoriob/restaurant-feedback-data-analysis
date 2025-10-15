@@ -1,14 +1,20 @@
 import pandas as pd
 import spacy
+import os
 from transformers import pipeline
 import re
 from collections import defaultdict
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+import torch
+import gc
 
 print("Carregando modelo de sentimento (BERT)...")
 # O modelo nlptown é ótimo para essa tarefa de classificação em 5 estrelas.
 SENTIMENT_PIPELINE = pipeline(
     task="sentiment-analysis",
-    model="nlptown/bert-base-multilingual-uncased-sentiment"
+    model="nlptown/bert-base-multilingual-uncased-sentiment",
+    device=0,  # Garante que estamos usando a GPU 0. cpu = -1
+    dtype=torch.float16,
 )
 
 print("Carregando modelo de linguagem (spaCy)...")
@@ -241,47 +247,52 @@ def transformar_dados(df, coluna_comentario='general_comment'):
         return "Indefinido"
 
     df_final['sentimento_geral'] = df_final.apply(calcular_sentimento_geral, axis=1)
-
+    df_final['categoria_nps'] = df_final['recommendation_rating'].apply(lambda x: 'Promotor' if x >= 9 else 'Neutro' if x == 7 else 'Detrator')
     print("Transformação concluída!")
+    print("Limpando objetos e cache da GPU...")
+    del analyzer # Remove o objeto da memória
+    gc.collect() # Força a coleta de lixo do Python
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache() # Limpa o cache da GPU do PyTorch
     return df_final
 
-if __name__ == "__main__":
-    data = {
-        "general_comment": [
-            "A comida estava ótima, mas o ambiente era sujo.",
-            "O atendimento foi excelente e o preço justo.",
-            "Demorou muito para chegar, comida fria e ruim.",
-            "Ambiente agradável e comida saborosa, recomendo!",
-            "Preço alto e porção pequena, não vale a pena.",
-            "O garçom foi muito educado, mas a música estava alta demais.",
-            "A sobremesa estava deliciosa, voltarei com certeza.",
-            "O banheiro estava limpo e o ambiente aconchegante.",
-            "A carne veio mal passada, pedi bem passada.",
-            "O restaurante estava lotado e o serviço foi lento.",
-            "Comida sem sabor algum.",
-            "Não gostei do atendimento.",
-        ],
-        "recommendation_rating": [4, 10, 1, 9, 2, 6, 10, 8, 3, 3, 2, 2]
-    }
-    df_exemplo = pd.DataFrame(data)
+# if __name__ == "__main__":
+#     data = {
+#         "general_comment": [
+#             "A comida estava ótima, mas o ambiente era sujo.",
+#             "O atendimento foi excelente e o preço justo.",
+#             "Demorou muito para chegar, comida fria e ruim.",
+#             "Ambiente agradável e comida saborosa, recomendo!",
+#             "Preço alto e porção pequena, não vale a pena.",
+#             "O garçom foi muito educado, mas a música estava alta demais.",
+#             "A sobremesa estava deliciosa, voltarei com certeza.",
+#             "O banheiro estava limpo e o ambiente aconchegante.",
+#             "A carne veio mal passada, pedi bem passada.",
+#             "O restaurante estava lotado e o serviço foi lento.",
+#             "Comida sem sabor algum.",
+#             "Não gostei do atendimento.",
+#         ],
+#         "recommendation_rating": [4, 10, 1, 9, 2, 6, 10, 8, 3, 3, 2, 2]
+#     }
+#     df_exemplo = pd.DataFrame(data)
     
-    resultado = transformar_dados(df_exemplo)
+#     resultado = transformar_dados(df_exemplo)
 
     
-    colunas_para_exibir = [
-        "general_comment", 
-        "sentimento_comida", "justificativa_comida",
-        "sentimento_servico", "justificativa_servico",
-        "sentimento_ambiente", "justificativa_ambiente",
-        "sentimento_preco", "justificativa_preco", 'sentimento_geral', 'categoria_nps'
-    ]
+#     colunas_para_exibir = [
+#         "general_comment", 
+#         "sentimento_comida", "justificativa_comida",
+#         "sentimento_servico", "justificativa_servico",
+#         "sentimento_ambiente", "justificativa_ambiente",
+#         "sentimento_preco", "justificativa_preco", 'sentimento_geral', 'categoria_nps'
+#     ]
     
-    for col in colunas_para_exibir:
-        if col not in resultado.columns:
-            resultado[col] = "Não Mencionado" if "sentimento" in col else [[] for _ in range(len(resultado))]
+#     for col in colunas_para_exibir:
+#         if col not in resultado.columns:
+#             resultado[col] = "Não Mencionado" if "sentimento" in col else [[] for _ in range(len(resultado))]
 
-    print("\n--- RESULTADOS DA ANÁLISE CORRIGIDA ---")
-    print(resultado[colunas_para_exibir].to_string())
+#     print("\n--- RESULTADOS DA ANÁLISE CORRIGIDA ---")
+#     print(resultado[colunas_para_exibir].to_string())
     
-    resultado.to_csv("resultados_absa_corrigido.csv", index=False, encoding='utf-8-sig')
-    print("\nResultados salvos em 'resultados_absa_corrigido.csv'")
+#     resultado.to_csv("resultados_absa_corrigido.csv", index=False, encoding='utf-8-sig')
+#     print("\nResultados salvos em 'resultados_absa_corrigido.csv'")

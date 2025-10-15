@@ -32,4 +32,4 @@ def calcular_nps(df):
     df_processado['nps_pred'] = model.predict(X)
     df_processado['recommendation_rating'] = df_processado['recommendation_rating'].fillna(df_processado['nps_pred'])
     df_processado.to_csv("nps_predictions.csv", index=False)
-    return df_processado
+    return df_processado['nps_pred']

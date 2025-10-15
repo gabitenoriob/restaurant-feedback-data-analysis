@@ -22,8 +22,7 @@ def medicao_churn(df):
     # Define a lista de features (variáveis) que o modelo usará para aprender
     features = [
         'service_rating', 'food_rating', 'environment_rating',
-        'sentimento_comida', 'sentimento_ambiente', 'sentimento_servico',
-        'categoria_nps'
+        'sentimento_comida', 'sentimento_ambiente', 'sentimento_servico', 'recommendation_rating'
     ]
     target = 'churn'
 
@@ -58,4 +57,4 @@ def medicao_churn(df):
     df_processado['churn_prob'] = rf.predict_proba(X_all)[:, 1] # Probabilidade de ser churn=1
 
     print("\nPrevisão de churn concluída para todos os dados.")
-    return df_processado
+    return df_processado['churn_pred']
