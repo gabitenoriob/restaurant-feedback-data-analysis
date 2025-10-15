@@ -244,7 +244,6 @@ def transformar_dados(df, coluna_comentario='general_comment'):
         if "Neutro" in sentimentos_set:
             return "Neutro"
         
-        return "Indefinido"
 
     df_final['sentimento_geral'] = df_final.apply(calcular_sentimento_geral, axis=1)
     df_final['categoria_nps'] = df_final['recommendation_rating'].apply(lambda x: 'Promotor' if x >= 9 else 'Neutro' if x == 7 else 'Detrator')

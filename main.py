@@ -5,6 +5,7 @@ from google.cloud import bigquery
 import pandas_gbq
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+import plots
 from transformar_dados import transformar_dados
 from medicao_churn import medicao_churn
 from calcular_nps import calcular_nps
@@ -22,14 +23,12 @@ def run_etl(request):
     
     try:
         # --- ETAPA DE EXTRAÇÃO ---
-        #conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
-        conn = psycopg2.connect(
-            dbname=os.environ.get("DB_NAME"),
-            user=os.environ.get("DB_USER"),
-            password=os.environ.get("DB_PASS"),
-            host=os.environ.get("DB_HOST"),
-            port=os.environ.get("DB_PORT")
-        )
+
+        connection_string = f"postgresql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASS')}@{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT')}/{os.environ.get('DB_NAME')}"
+
+        print("Conectando ao banco de dados...")
+        # Conecta usando a única string
+        conn = psycopg2.connect(connection_string)
         #Atualiza por dia
         query = "SELECT * FROM public.feedback WHERE timestamp > NOW() - INTERVAL '15 day';"
         query_attendant = "SELECT id, name FROM public.attendants;"
@@ -74,6 +73,8 @@ def run_etl(request):
         print(df_final.columns.tolist())
         print(df_final.dtypes)
 
+        df_final.to_csv("dados_transformados.csv", index=False)
+
         # --- ETAPA DE CARGA ---
         project_id = os.environ.get("GCP_PROJECT_ID")
         tabela_destino = "restaurant_feedback.fato_feedbacks" 
@@ -85,7 +86,7 @@ def run_etl(request):
             if_exists='append'
         )
         print(f"Carga concluída. {len(df_final)} registros carregados no BigQuery.")
-        
+        plots.plotagens(df_final)
         return ("ETL executado com sucesso!", 200)
 
     except Exception as e:
